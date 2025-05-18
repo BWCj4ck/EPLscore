@@ -1,0 +1,648 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>EPL Score Predictor - GW38 2025/05/25</title> {/* CHANGED TITLE */}
+    <script src="https://unpkg.com/react@18/umd/react.development.js"></script>
+    <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Open Sans', 'Helvetica Neue', sans-serif;
+            margin: 0;
+            padding: 20px;
+            background-color: #f4f7f6;
+            color: #333;
+            line-height: 1.6;
+        }
+
+        #root {
+            max-width: 900px;
+            margin: 0 auto;
+            background-color: #fff;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+
+        h1, h2, h3 {
+            color: #1a2a6c; /* Dark blue */
+            text-align: center;
+        }
+
+        nav {
+            display: flex;
+            justify-content: center;
+            margin-bottom: 20px;
+            padding-bottom: 10px;
+            border-bottom: 1px solid #eee;
+        }
+
+        nav button {
+            background-color: #007bff;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            margin: 0 10px;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 1em;
+            transition: background-color 0.3s ease;
+        }
+
+        nav button:hover {
+            background-color: #0056b3;
+        }
+        nav button.active {
+            background-color: #b21f1f; /* Reddish for active */
+        }
+
+        .fixture-list {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(350px, 1fr));
+            gap: 20px;
+        }
+
+        .fixture-item {
+            background-color: #f9f9f9;
+            padding: 15px;
+            border-radius: 6px;
+            border: 1px solid #e0e0e0;
+        }
+
+        .fixture-teams {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            font-weight: bold;
+            margin-bottom: 10px;
+        }
+
+        .fixture-teams span {
+            flex: 1;
+            text-align: center;
+        }
+
+        .fixture-teams .team-name {
+             min-width: 100px;
+        }
+
+        .score-inputs input {
+            width: 40px;
+            padding: 8px;
+            text-align: center;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+            margin: 0 5px;
+            font-size: 1em;
+        }
+
+        .kickoff-time {
+            font-size: 0.9em;
+            color: #555;
+            text-align: center;
+            margin-bottom: 10px;
+        }
+
+        .submit-section, .wildcard-section, .user-section {
+            margin-top: 20px;
+            text-align: center;
+        }
+
+        .submit-section button, .wildcard-section button {
+            background-color: #28a745;
+            color: white;
+            padding: 12px 25px;
+            border: none;
+            border-radius: 5px;
+            font-size: 1.1em;
+            cursor: pointer;
+        }
+        .wildcard-section button.active {
+            background-color: #ffc107;
+            color: #333;
+        }
+        .submit-section button:disabled {
+            background-color: #ccc;
+            cursor: not-allowed;
+        }
+
+        .lockdown-message, .submission-feedback {
+            text-align: center;
+            margin-top: 15px;
+            padding: 10px;
+            border-radius: 5px;
+        }
+        .lockdown-message {
+            background-color: #ffeeba;
+            color: #856404;
+            border: 1px solid #ffeeba;
+        }
+        .submission-feedback.success {
+            background-color: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+        .submission-feedback.error {
+            background-color: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+        }
+
+        .user-section input {
+            padding: 10px;
+            margin-right: 10px;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+            width: 200px;
+        }
+        .user-section button {
+             padding: 10px 15px;
+        }
+
+        .leaderboard-table {
+            width: 100%;
+            margin-top: 20px;
+            border-collapse: collapse;
+        }
+
+        .leaderboard-table th, .leaderboard-table td {
+            border: 1px solid #ddd;
+            padding: 10px;
+            text-align: left;
+        }
+
+        .leaderboard-table th {
+            background-color: #007bff;
+            color: white;
+            text-align: center;
+        }
+
+        .leaderboard-table tr:nth-child(even) {
+            background-color: #f2f2f2;
+        }
+        .leaderboard-table td:nth-child(1) { font-weight: bold; }
+        .leaderboard-table td:nth-child(3),
+        .leaderboard-table td:nth-child(4) {
+             text-align: center;
+        }
+    </style>
+</head>
+<body>
+    <div id="root"></div>
+
+    <script type="text/babel">
+        const { useState, useEffect, useMemo } = React;
+
+        // --- Configuration ---
+        // Gameweek 38, Sunday May 25th, 2025
+        const GAMEWEEK_ID = 'GW38_20250525'; 
+        const LOCKDOWN_HOURS_BEFORE_FIRST_KICKOFF = 2;
+
+        // Assumed Premier League Clubs for 2024-2025 Season (teams from your fixtures)
+        // This list isn't strictly used for fixture display but good for reference.
+        const PREMIER_LEAGUE_CLUBS_24_25 = [
+            "Arsenal", "Aston Villa", "Bournemouth", "Brentford", "Brighton & Hove Albion",
+            "Chelsea", "Crystal Palace", "Everton", "Fulham", "Ipswich Town",
+            "Leicester City", "Liverpool", "Manchester City", "Manchester United",
+            "Newcastle United", "Nottingham Forest", "Southampton", "Tottenham Hotspur",
+            "West Ham United", "Wolverhampton Wanderers"
+        ];
+
+        // Fixtures for GW38, Sunday 25th May 2025, 4 PM UK (15:00 UTC)
+        // CHANGED SECTION: KICKOFF_TIME_GW38_2025 & INITIAL_FIXTURES
+        const KICKOFF_TIME_GW38_2025 = "2025-05-25T15:00:00Z";
+        const INITIAL_FIXTURES = [
+            { id: 1, homeTeam: "Bournemouth", awayTeam: "Leicester City", kickoffTime: KICKOFF_TIME_GW38_2025 },
+            { id: 2, homeTeam: "Fulham", awayTeam: "Manchester City", kickoffTime: KICKOFF_TIME_GW38_2025 },
+            { id: 3, homeTeam: "Ipswich Town", awayTeam: "West Ham United", kickoffTime: KICKOFF_TIME_GW38_2025 },
+            { id: 4, homeTeam: "Liverpool", awayTeam: "Crystal Palace", kickoffTime: KICKOFF_TIME_GW38_2025 },
+            { id: 5, homeTeam: "Manchester United", awayTeam: "Aston Villa", kickoffTime: KICKOFF_TIME_GW38_2025 },
+            { id: 6, homeTeam: "Newcastle United", awayTeam: "Everton", kickoffTime: KICKOFF_TIME_GW38_2025 },
+            { id: 7, homeTeam: "Nottingham Forest", awayTeam: "Chelsea", kickoffTime: KICKOFF_TIME_GW38_2025 },
+            { id: 8, homeTeam: "Southampton", awayTeam: "Arsenal", kickoffTime: KICKOFF_TIME_GW38_2025 },
+            { id: 9, homeTeam: "Tottenham Hotspur", awayTeam: "Brighton & Hove Albion", kickoffTime: KICKOFF_TIME_GW38_2025 },
+            { id: 10, homeTeam: "Wolverhampton Wanderers", awayTeam: "Brentford", kickoffTime: KICKOFF_TIME_GW38_2025 },
+        ];
+
+        // Official Results - Will be empty until games are played and updated.
+        const OFFICIAL_RESULTS = {
+            [GAMEWEEK_ID]: [] // No results yet for GW38 2025
+            // To pre-populate with nulls for scoring system structure (optional):
+            // [GAMEWEEK_ID]: INITIAL_FIXTURES.map(f => ({ fixtureId: f.id, homeScore: null, awayScore: null }))
+        };
+
+
+        // --- Helper Functions ---
+        const getFirstKickoffTime = (fixtures) => {
+            if (!fixtures || fixtures.length === 0) return null;
+            const validFixtures = fixtures.filter(f => f.kickoffTime && !isNaN(new Date(f.kickoffTime).getTime()));
+            if (validFixtures.length === 0) return null;
+            return new Date(Math.min(...validFixtures.map(f => new Date(f.kickoffTime).getTime())));
+        };
+
+        const getLockdownTime = (fixtures) => {
+            const firstKickoff = getFirstKickoffTime(fixtures);
+            if (!firstKickoff) return null;
+            return new Date(firstKickoff.getTime() - LOCKDOWN_HOURS_BEFORE_FIRST_KICKOFF * 60 * 60 * 1000);
+        };
+
+        const formatGameweekDisplay = (gwId) => {
+            const parts = gwId.split('_');
+            if (parts.length === 2) {
+                const datePart = parts[1]; 
+                const year = datePart.substring(0, 4);
+                const month = datePart.substring(4, 6);
+                const day = datePart.substring(6, 8);
+                return `${parts[0]} (${day}/${month}/${year})`;
+            }
+            return gwId;
+        };
+
+        // --- React Components ---
+
+        function PredictionPage({ currentUser, onSetCurrentUser }) {
+            const [predictions, setPredictions] = useState(() => {
+                const initial = {};
+                INITIAL_FIXTURES.forEach(f => {
+                    initial[f.id] = { homeScore: '', awayScore: '' };
+                });
+                return initial;
+            });
+            const [wildcardActive, setWildcardActive] = useState(false);
+            const [isLocked, setIsLocked] = useState(false);
+            const [lockdownTime, setLockdownTime] = useState(null);
+            const [feedback, setFeedback] = useState({ message: '', type: '' });
+            const [hasSubmitted, setHasSubmitted] = useState(false);
+            const [tempUsername, setTempUsername] = useState(currentUser || "");
+
+            useEffect(() => {
+                const currentFixtures = INITIAL_FIXTURES;
+                const ldTime = getLockdownTime(currentFixtures);
+                setLockdownTime(ldTime);
+
+                const initialPreds = {};
+                currentFixtures.forEach(f => {
+                    initialPreds[f.id] = { homeScore: '', awayScore: '' };
+                });
+
+                const checkLockdown = () => {
+                    const now = new Date();
+                    if (ldTime && now >= ldTime) {
+                        setIsLocked(true);
+                    } else {
+                        setIsLocked(false);
+                    }
+                };
+                checkLockdown(); 
+                const interval = setInterval(checkLockdown, 30000); 
+
+                if (currentUser) {
+                    setTempUsername(currentUser); // Sync tempUsername if currentUser is already set (e.g. from localStorage)
+                    const storedData = JSON.parse(localStorage.getItem(`predictions_${GAMEWEEK_ID}`)) || [];
+                    const userPredictionData = storedData.find(p => p.username === currentUser);
+                    if (userPredictionData) {
+                        const loadedPredictions = { ...initialPreds };
+                        for (const fixtureId in userPredictionData.predictions) {
+                            if (loadedPredictions.hasOwnProperty(fixtureId)) {
+                                loadedPredictions[fixtureId] = userPredictionData.predictions[fixtureId];
+                            }
+                        }
+                        setPredictions(loadedPredictions);
+                        setWildcardActive(userPredictionData.wildcardUsed);
+                        setHasSubmitted(true);
+                    } else {
+                        setPredictions(initialPreds);
+                        setWildcardActive(false);
+                        setHasSubmitted(false);
+                    }
+                } else {
+                    setTempUsername(""); // Clear temp username if no current user
+                    setPredictions(initialPreds);
+                    setWildcardActive(false);
+                    setHasSubmitted(false);
+                }
+                return () => clearInterval(interval);
+            }, [currentUser]); 
+
+            const handleScoreChange = (fixtureId, team, value) => {
+                const currentLdTime = getLockdownTime(INITIAL_FIXTURES);
+                if (isLocked || (currentLdTime && new Date() >= currentLdTime)) return;
+
+                const score = value === '' ? '' : parseInt(value, 10);
+                if (value === '' || (!isNaN(score) && score >= 0 && score <= 20)) {
+                    setPredictions(prev => ({
+                        ...prev,
+                        [fixtureId]: {
+                            ...prev[fixtureId],
+                            [team]: score
+                        }
+                    }));
+                    setFeedback({ message: '', type: '' }); // Clear previous feedback on change
+                }
+            };
+
+            const handleUsernameChange = (e) => {
+                setTempUsername(e.target.value);
+            };
+
+            const handleSetUsername = () => {
+                const trimmedUsername = tempUsername.trim();
+                if (trimmedUsername) {
+                    if (currentUser !== trimmedUsername) {
+                        onSetCurrentUser(trimmedUsername);
+                        localStorage.setItem('eplPredictorUser', trimmedUsername);
+                        setFeedback({ message: `Username set to ${trimmedUsername}. Your predictions for ${formatGameweekDisplay(GAMEWEEK_ID)} will be loaded or you can enter new ones.`, type: 'success' });
+                    } else {
+                        setFeedback({ message: `Username ${trimmedUsername} is already active.`, type: 'info' });
+                    }
+                } else {
+                    setFeedback({ message: 'Username cannot be empty.', type: 'error' });
+                }
+            };
+
+            const handleSubmit = () => {
+                if (!currentUser) {
+                    setFeedback({ message: 'Please set your username before submitting.', type: 'error' });
+                    return;
+                }
+                const currentLdTime = getLockdownTime(INITIAL_FIXTURES);
+                if (currentLdTime && new Date() >= currentLdTime) {
+                    setIsLocked(true);
+                    setFeedback({ message: 'Prediction deadline has passed. Submissions are locked.', type: 'error' });
+                    return;
+                }
+
+                const allScoresEntered = INITIAL_FIXTURES.every(f => {
+                    const pred = predictions[f.id];
+                    return pred && typeof pred.homeScore === 'number' && typeof pred.awayScore === 'number';
+                });
+
+                if (!allScoresEntered) {
+                    setFeedback({ message: 'Please enter scores for all fixtures.', type: 'error' });
+                    return;
+                }
+
+                const submissionData = {
+                    username: currentUser,
+                    gameweekId: GAMEWEEK_ID,
+                    predictions: predictions,
+                    wildcardUsed: wildcardActive,
+                    submittedAt: new Date().toISOString()
+                };
+
+                let allPredictions = JSON.parse(localStorage.getItem(`predictions_${GAMEWEEK_ID}`)) || [];
+                allPredictions = allPredictions.filter(p => p.username !== currentUser);
+                allPredictions.push(submissionData);
+                localStorage.setItem(`predictions_${GAMEWEEK_ID}`, JSON.stringify(allPredictions));
+
+                setHasSubmitted(true);
+                setFeedback({ message: 'Predictions submitted successfully!', type: 'success' });
+            };
+
+            const firstKickoff = useMemo(() => getFirstKickoffTime(INITIAL_FIXTURES), []);
+
+            return (
+                <div>
+                    <h2>{formatGameweekDisplay(GAMEWEEK_ID)} - Predict Scores</h2>
+                    <div className="user-section">
+                        <input
+                            type="text"
+                            placeholder="Enter your username"
+                            value={tempUsername}
+                            onChange={handleUsernameChange}
+                        />
+                        <button onClick={handleSetUsername}>
+                            {currentUser ? `Change User (Current: ${currentUser})` : 'Set User'}
+                        </button>
+                    </div>
+
+                    {lockdownTime && (
+                        <div className="lockdown-message">
+                            Predictions lock at: {lockdownTime.toLocaleString()}
+                            {(isLocked || (lockdownTime && new Date() >= lockdownTime)) && <strong> (LOCKED)</strong>}
+                        </div>
+                    )}
+                    {firstKickoff && <p style={{textAlign: 'center', fontSize: '0.9em'}}>First game K.O.: {firstKickoff.toLocaleString()}</p>}
+
+                    {feedback.message && (
+                        <div className={`submission-feedback ${feedback.type || 'info'}`}>
+                            {feedback.message}
+                        </div>
+                    )}
+
+                    <div className="fixture-list">
+                        {INITIAL_FIXTURES.map(fixture => (
+                            <div key={fixture.id} className="fixture-item">
+                                <div className="kickoff-time">
+                                    {new Date(fixture.kickoffTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                                    {' - '}
+                                    {new Date(fixture.kickoffTime).toLocaleDateString([], { weekday: 'short', month: 'short', day: 'numeric' })}
+                                </div>
+                                <div className="fixture-teams">
+                                    <span className="team-name">{fixture.homeTeam}</span>
+                                    <div className="score-inputs">
+                                        <input
+                                            type="number"
+                                            min="0" max="20"
+                                            value={predictions[fixture.id]?.homeScore === '' ? '' : String(predictions[fixture.id]?.homeScore)}
+                                            onChange={(e) => handleScoreChange(fixture.id, 'homeScore', e.target.value)}
+                                            disabled={(isLocked && hasSubmitted) || (lockdownTime && new Date() >= lockdownTime)}
+                                            aria-label={`${fixture.homeTeam} score`}
+                                        />
+                                        <span>-</span>
+                                        <input
+                                            type="number"
+                                            min="0" max="20"
+                                            value={predictions[fixture.id]?.awayScore === '' ? '' : String(predictions[fixture.id]?.awayScore)}
+                                            onChange={(e) => handleScoreChange(fixture.id, 'awayScore', e.target.value)}
+                                            disabled={(isLocked && hasSubmitted) || (lockdownTime && new Date() >= lockdownTime)}
+                                            aria-label={`${fixture.awayTeam} score`}
+                                        />
+                                    </div>
+                                    <span className="team-name">{fixture.awayTeam}</span>
+                                </div>
+                            </div>
+                        ))}
+                    </div>
+
+                    <div className="wildcard-section">
+                        <button
+                            onClick={() => setWildcardActive(!wildcardActive)}
+                            className={wildcardActive ? 'active' : ''}
+                            disabled={(isLocked && hasSubmitted) || (lockdownTime && new Date() >= lockdownTime)}
+                        >
+                            Wildcard {wildcardActive ? 'Activated (2x Points)' : 'Deactivated'}
+                        </button>
+                    </div>
+
+                    <div className="submit-section">
+                        <button onClick={handleSubmit} disabled={(isLocked || (lockdownTime && new Date() >= lockdownTime)) || !currentUser}>
+                            {(isLocked || (lockdownTime && new Date() >= lockdownTime)) ? 'Submissions Locked' : (hasSubmitted ? 'Update Predictions' : 'Submit Predictions')}
+                        </button>
+                    </div>
+                </div>
+            );
+        }
+
+        function LeaderboardPage() {
+            const [leaderboardData, setLeaderboardData] = useState([]);
+
+            useEffect(() => {
+                const calculateScores = () => {
+                    const allGamePredictions = JSON.parse(localStorage.getItem(`predictions_${GAMEWEEK_ID}`)) || [];
+                    // Make sure to filter for results that are actually entered (not null)
+                    const officialResultsForGameweek = (OFFICIAL_RESULTS[GAMEWEEK_ID] || [])
+                                                    .filter(r => r.homeScore !== null && typeof r.homeScore === 'number' && 
+                                                                 r.awayScore !== null && typeof r.awayScore === 'number');
+
+                    if (officialResultsForGameweek.length === 0 && allGamePredictions.length > 0) {
+                         // Predictions exist, but no official results
+                        const pendingData = allGamePredictions.map(playerSubmission => ({
+                            username: playerSubmission.username,
+                            points: "Pending Results",
+                            wildcardUsed: playerSubmission.wildcardUsed,
+                            gameweek: GAMEWEEK_ID
+                        }));
+                        setLeaderboardData(pendingData.sort((a,b) => a.username.localeCompare(b.username)));
+                        return;
+                    } else if (allGamePredictions.length === 0) {
+                        // No predictions submitted
+                        setLeaderboardData([]);
+                        return;
+                    }
+                    
+                    const scoredData = allGamePredictions.map(playerSubmission => {
+                        let gameweekPoints = 0;
+                        INITIAL_FIXTURES.forEach(fixture => {
+                            const userPred = playerSubmission.predictions[fixture.id];
+                            const actualResult = officialResultsForGameweek.find(r => r.fixtureId === fixture.id);
+
+                            if (userPred && (typeof userPred.homeScore === 'number') && (typeof userPred.awayScore === 'number') && actualResult) {
+                                const predictedHome = userPred.homeScore;
+                                const predictedAway = userPred.awayScore;
+                                const actualHome = actualResult.homeScore;
+                                const actualAway = actualResult.awayScore;
+
+                                let pointsForFixture = 0;
+                                if (predictedHome === actualHome && predictedAway === actualAway) {
+                                    pointsForFixture = 5;
+                                }
+                                else {
+                                    const predictedOutcome = predictedHome > predictedAway ? 'H' : (predictedHome < predictedAway ? 'A' : 'D');
+                                    const actualOutcome = actualHome > actualAway ? 'H' : (actualHome < actualAway ? 'A' : 'D');
+                                    if (predictedOutcome === actualOutcome) {
+                                        pointsForFixture = 2;
+                                    }
+                                }
+                                gameweekPoints += pointsForFixture;
+                            }
+                        });
+
+                        if (playerSubmission.wildcardUsed) {
+                            gameweekPoints *= 2;
+                        }
+
+                        return {
+                            username: playerSubmission.username,
+                            points: gameweekPoints, // Will be a number now if results are in
+                            wildcardUsed: playerSubmission.wildcardUsed,
+                            gameweek: GAMEWEEK_ID
+                        };
+                    });
+
+                    // Sort by points (descending), then by username (ascending) for ties
+                    scoredData.sort((a, b) => {
+                        if (b.points !== a.points) {
+                            return b.points - a.points;
+                        }
+                        return a.username.localeCompare(b.username);
+                    });
+                    setLeaderboardData(scoredData);
+                };
+
+                calculateScores();
+            }, []); 
+
+            return (
+                <div>
+                    <h2>{formatGameweekDisplay(GAMEWEEK_ID)} Leaderboard</h2>
+                    {leaderboardData.length === 0 && <p>No predictions submitted for this gameweek yet, or official results are not in.</p>}
+                    {leaderboardData.length > 0 && (
+                        <table className="leaderboard-table">
+                            <thead>
+                                <tr>
+                                    <th>Rank</th>
+                                    <th>Player</th>
+                                    <th>Points</th>
+                                    <th>Wildcard</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {leaderboardData.map((player, index) => (
+                                    <tr key={player.username + player.gameweek}>
+                                        <td>{player.points === "Pending Results" ? "-" : index + 1}</td>
+                                        <td>{player.username}</td>
+                                        <td>{player.points}</td>
+                                        <td>{player.wildcardUsed ? '✅ (2x)' : '❌'}</td>
+                                    </tr>
+                                ))}
+                            </tbody>
+                        </table>
+                    )}
+                     <p style={{fontSize: "0.8em", textAlign: "center", marginTop: "20px"}}>
+                        Scoring: Correct Score = 5 points. Correct Result (Win/Draw/Loss) = 2 points.
+                    </p>
+                </div>
+            );
+        }
+
+        function App() {
+            const [currentPage, setCurrentPage] = useState('predict'); 
+            const [currentUser, setCurrentUser] = useState(null);
+
+            useEffect(() => {
+                const storedUser = localStorage.getItem('eplPredictorUser');
+                if (storedUser) {
+                    setCurrentUser(storedUser);
+                }
+                console.log("App initialized for Gameweek:", GAMEWEEK_ID, formatGameweekDisplay(GAMEWEEK_ID));
+            }, []);
+
+            const handleSetCurrentUser = (username) => {
+                setCurrentUser(username);
+            };
+
+            return (
+                <>
+                    <h1>EPL Score Predictor</h1>
+                    <nav>
+                        <button
+                            onClick={() => setCurrentPage('predict')}
+                            className={currentPage === 'predict' ? 'active' : ''}
+                        >
+                            Make Predictions ({formatGameweekDisplay(GAMEWEEK_ID)})
+                        </button>
+                        <button
+                            onClick={() => setCurrentPage('leaderboard')}
+                            className={currentPage === 'leaderboard' ? 'active' : ''}
+                        >
+                            View Leaderboard ({formatGameweekDisplay(GAMEWEEK_ID)})
+                        </button>
+                    </nav>
+
+                    {currentPage === 'predict' && (
+                        <PredictionPage currentUser={currentUser} onSetCurrentUser={handleSetCurrentUser} />
+                    )}
+                    {currentPage === 'leaderboard' && <LeaderboardPage />}
+                </>
+            );
+        }
+
+        const root = ReactDOM.createRoot(document.getElementById('root'));
+        root.render(<App />);
+    </script>
+</body>
+</html>
